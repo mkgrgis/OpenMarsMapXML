@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>(♂) OMM</title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="shortcut icon" href="Mars-icon.png" />
+	<script src='lib/xml2json.js'></script>
+	<script src='lib/wicket.js'></script>
+	<script src='lib/shp.js'></script>
+	<script src='OMM.js'></script>
+</head>
+
+<body>
+	<p>(♂) OMM, JavaScript console module</p>
+	<script>
+		var OpenMarsMap_baseobj = {};
+
+		function gMr_ok(req) {
+			OpenMarsMap_baseobj.gMars = JSON.parse(req.currentTarget.responseText);
+			console.log('gMars ok');
+			omm_transformaion();
+		}
+
+		function wkt_ok(req) {
+			OpenMarsMap_baseobj.WKT = JSON.parse(req.currentTarget.responseText);
+			console.log('Wkt ok');
+			// Mars nomenclature.js
+			omm_transformaion();
+		}
+
+		function nom_ok(req) {
+			OpenMarsMap_baseobj.UAI_nom = JSON.parse(req.currentTarget.responseText);
+			console.log('nom ok');
+			omm_transformaion();
+		}
+
+		function shp_ok(data) {
+			function utf8Decode(utftext) {
+				var string = "";
+				var i = 0;
+				var c = c1 = c2 = 0;
+				while (i < utftext.length) {
+					c = utftext.charCodeAt(i);
+					if (c < 128) {
+						string += String.fromCharCode(c);
+						i++;
+					}
+					else if ((c > 191) && (c < 224)) {
+						c2 = utftext.charCodeAt(i + 1);
+						string += String.fromCharCode(((c & 31) << 6) | (c2 & 63)); i += 2;
+					}
+					else {
+						c2 = utftext.charCodeAt(i + 1);
+						c3 = utftext.charCodeAt(i + 2);
+						string += String.fromCharCode(((c & 15) << 12) | ((c2 & 63) << 6) | (c3 & 63)); i += 3;
+					}
+				}
+				return string;
+			};
+			function UAI_obj_Process(feature) {
+				if (feature.properties) {
+					var fp = feature.properties;
+					fp.name_EBCDIC = fp.clean_name;
+					delete fp.clean_name;
+					if (fp.quad_code && fp.quad_name) {
+						fp.quad = { code: fp.quad_code, name: fp.quad_name };
+					}
+					delete fp.quad_name;
+					delete fp.quad_code;
+					fp.name = utf8Decode(fp.name);
+					fp.origin = utf8Decode(fp.origin);
+
+					var kodo = fp.code;
+					var url_el = fp.link.split('/');
+					fp.UAI_id = Number(url_el[url_el.length - 1]);
+					fp.lim = [
+						[parseFloat(fp.max_lon), parseFloat(fp.min_lat)],
+						[parseFloat(fp.min_lon), parseFloat(fp.max_lat)]
+					];
+					delete fp.max_lat;
+					delete fp.min_lon;
+					delete fp.min_lat;
+					delete fp.max_lon;
+					fp.center = [parseFloat(fp.center_lon), parseFloat(fp.center_lat)];
+					delete fp.center_lat;
+					delete fp.center_lon;
+					// shp - OMM
+					fp[fp.type.split(',')[0].toLowerCase()] = "1";
+					delete fp.type;
+					fp["int_name"] = fp.name;
+					delete name;
+					fp["name:ethnicity"] = fp.ethnicity;
+					delete fp.ethnicity;
+					fp["name:continent"] = fp.continent;
+					delete fp.continent;
+					fp["name:origin"] = fp.origin.split(';')[0];
+					var d = fp.origin.split(';')[1];
+					if (typeof d != 'undefined')
+						fp["name:description"] = d.trim();
+					delete fp.origin;
+					fp["UAI:id"] = fp.UAI_id;
+					delete fp.UAI_id;
+					fp["UAI:start_date"] = fp.approvaldt;
+					delete fp.approvaldt;
+					fp["UAI:status"] = fp.approval;
+					delete fp.approval;
+					fp["UAI:groupcode"] = fp.code;
+					delete fp.code;
+					fp["UAI:diameter"] = fp.diameter;
+					delete fp.diameter;
+					fp["URL"] = fp.link;
+					delete fp.link;
+					delete fp.lim;
+					delete fp.quad;
+					delete fp.name_EBCDIC;
+					delete fp.center;
+				}
+			} // UAI_obj			
+			OpenMarsMap_baseobj.shp_data = data;
+			for (var i in OpenMarsMap_baseobj.shp_data.features) {
+				UAI_obj_Process(OpenMarsMap_baseobj.shp_data.features[i]);
+			}
+			console.log('shp ok');
+			omm_transformaion();
+		}
+
+		function reqJson(url, endf) {
+			var req = new XMLHttpRequest();
+			req.overrideMimeType("application/json");
+			req.open('GET', url, true);
+			req.addEventListener('load', endf);
+			req.send(null);
+		}
+
+		//// OPENMARSMAP MAIN THREAD
+		var baseHost = 'https://raw.githubusercontent.com/mkgrgis';
+		var OpenData = baseHost + '/OpenPlanetaryData/master/';
+
+		console.log('start');
+		shp(OpenData + '♂/MARS_nomenclature.zip').then(shp_ok);
+		reqJson(OpenData + 'universal/nomenclature.json', nom_ok);
+		reqJson(OpenData + '♂/MARS_nomenclature.json', wkt_ok);
+		reqJson(baseHost + '/gMarsWMS/master/data/gMars.json', gMr_ok);
+
+		function omm_transformaion() {
+			if (typeof OpenMarsMap_baseobj.shp_data == 'undefined' ||
+				typeof OpenMarsMap_baseobj.gMars == 'undefined' ||
+				typeof OpenMarsMap_baseobj.WKT == 'undefined' ||
+				typeof OpenMarsMap_baseobj.UAI_nom == 'undefined'
+			)
+				return;
+			console.log('All ok');
+			OpenMarsMap_construct(OpenMarsMap_baseobj)
+		}
+	</script>
+</body>
+
+</html>
